@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grocery Shopping List</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f9ff;
+            color: #1f2937;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        /* Light mode specific styles for elements that might get overridden by dark mode */
+        input[type="text"],
+        input[type="number"],
+        select {
+            background-color: white;
+            color: #1f2937; /* Tailwind gray-800 or similar for light mode text */
+            border: 1px solid #d1d5db; /* Tailwind gray-300 for light mode border */
+        }
+        input::placeholder {
+            color: #9ca3af; /* Tailwind gray-400 */
+        }
+        .quick-add-items-container { /* Class for the div holding quick add buttons */
+            background-color: white;
+        }
+        #view-saved-list-modal ul#view-list-items {
+            background-color: #f9fafb; /* Tailwind gray-50 */
+            border-color: #e5e7eb; /* Tailwind gray-200 */
+        }
+        #view-saved-list-modal ul#view-list-items li {
+            color: #374151; /* Tailwind gray-700 */
+            border-color: #e5e7eb;
+        }
+        #view-saved-list-modal ul#view-list-items li:hover {
+            background-color: #f3f4f6; /* Tailwind gray-100 */
+        }
+
+
+        /* Dark Mode Styles */
+        html.dark body {
+            background-color: #1f2937;
+            color: #f3f4f6;
+        }
+        html.dark .bg-white { /* General purpose white backgrounds become dark */
+            background-color: #374151;
+            color: #f3f4f6;
+        }
+        html.dark .bg-sky-100 {
+            background-color: #0c4a6e;
+        }
+        html.dark .text-sky-700, html.dark .text-sky-800 {
+            color: #7dd3fc;
+        }
+        /* Ensure text that should be light in dark mode is explicitly set */
+        html.dark .text-gray-900 { color: #f3f4f6; }
+        html.dark .text-gray-800 { color: #e5e7eb; }
+        html.dark .text-gray-700 { color: #d1d5db; }
+        html.dark .text-gray-600 { color: #cbd5e1; }
+        html.dark .text-gray-500 { color: #9ca3af; }
+        html.dark .text-gray-400 { color: #9ca3af; }
+
+        html.dark .border-gray-200 { border-color: #4b5563; }
+        html.dark .border-gray-300 { border-color: #6b7280; }
+
+        html.dark .hover\:bg-sky-50:hover { background-color: #374151; }
+        html.dark .item-row:hover { background-color: #4b5563; }
+
+        html.dark input[type="text"],
+        html.dark input[type="number"],
+        html.dark select {
+            background-color: #4b5563;
+            color: #f3f4f6;
+            border-color: #6b7280;
+        }
+        html.dark input::placeholder { color: #9ca3af; }
+
+        html.dark .category-header {
+             background: linear-gradient(135deg, #075985 0%, #0c4a6e 100%);
+        }
+        html.dark .bg-sky-50 { background-color: #1e3a8a; } /* Table header */
+
+        html.dark .modal-content { /* Default modal content in dark mode */
+            background-color: #374151;
+            color: #f3f4f6;
+        }
+        html.dark #view-saved-list-modal .modal-content { /* Specific modal */
+             background-color: #2d3748; /* Even darker if needed */
+        }
+        html.dark .quick-add-items-container { /* Quick add items container in dark mode */
+            background-color: #374151; /* Match card bg */
+        }
+        html.dark #view-saved-list-modal ul#view-list-items {
+            background-color: #374151;
+            border-color: #4b5563;
+        }
+        html.dark #view-saved-list-modal ul#view-list-items li {
+            color: #e2e8f0;
+            border-color: #4b5563;
+        }
+         html.dark #view-saved-list-modal ul#view-list-items li:hover {
+            background-color: #4b5563;
+        }
+
+
+        .category-header {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        }
+        .item-row:hover {
+            background-color: #e0f2fe;
+        }
+        input:focus, select:focus {
+            outline: 2px solid #0ea5e9;
+            box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+        }
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000; padding: 1rem;
+        }
+        .modal-content {
+            background-color: white; padding: 1.5rem; border-radius: 0.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            text-align: center; width: 90%; max-width: 400px;
+        }
+        #view-saved-list-modal .modal-content {
+            max-width: 500px;
+        }
+        .modal-buttons button {
+            margin: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 0.375rem;
+            font-weight: 600; transition: background-color 0.2s, transform 0.1s;
+        }
+        .modal-buttons button:active { transform: translateY(1px); }
+        .modal-confirm-button { background-color: #ef4444; color: white; }
+        .modal-confirm-button:hover { background-color: #dc2626; }
+        .modal-cancel-button { background-color: #6b7280; color: white; }
+        .modal-cancel-button:hover { background-color: #4b5563; }
+
+        .sortable-ghost { opacity: 0.4; background-color: #c7d2fe;}
+        .sortable-drag { cursor: grabbing; }
+        #grocery-list tr { cursor: grab; }
+
+        /* Print Styles */
+        @media print {
+            body > #page-content {
+                display: none !important; visibility: hidden !important;
+            }
+            #print-content-area {
+                display: block !important; visibility: visible !important;
+                position: absolute !important; left: 0 !important; top: 0 !important;
+                width: 100% !important; background-color: white !important; color: black !important;
+            }
+            #print-content-area * {
+                visibility: visible !important; color: black !important;
+            }
+            #print-content-area .bg-sky-100 {
+                 background-color: #e0f2fe !important;
+                 -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+            }
+             #print-content-area .text-sky-800, #print-content-area .text-sky-700 {
+                color: #075985 !important;
+            }
+            #print-summary-section .flex-wrap button { display: none !important; }
+            #print-summary-section {
+                 border: 1px solid #ccc !important; padding: 1rem !important; margin-bottom: 1rem !important;
+            }
+            #print-items-table {
+                width: 100% !important; border-collapse: collapse !important;
+                font-size: 10pt !important; margin-top: 1rem !important;
+            }
+            #print-items-table th,
+            #print-items-table td {
+                border: 1px solid #999 !important; padding: 6px !important; text-align: left !important;
+            }
+            #print-items-table th {
+                background-color: #f0f0f0 !important;
+                 -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+            }
+            #print-items-table .text-center-print { text-align: center !important; }
+            html.dark #print-content-area, html.dark #print-content-area * {
+                background-color: white !important; color: black !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="print-content-area" class="hidden print:block"></div>
+
+    <div id="page-content" class="container mx-auto px-4 py-8 max-w-5xl print:hidden">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-center text-sky-700">My Grocery List</h1>
+            <button id="dark-mode-toggle" class="p-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white transition">🌙</button>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-4 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex flex-wrap items-center gap-4">
+                <div>
+                    <label for="currency-select" class="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                    <select id="currency-select" class="p-2 border border-gray-300 rounded-md">
+                        <option value="INR">₹ (INR)</option> <option value="USD">$ (USD)</option>
+                        <option value="EUR">€ (EUR)</option> <option value="GBP">£ (GBP)</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filter-category" class="block text-sm font-medium text-gray-700 mb-1">Filter by Category</label>
+                    <select id="filter-category" class="p-2 border border-gray-300 rounded-md">
+                        <option value="all">All Categories</option>
+                    </select>
+                </div>
+            </div>
+            <button id="export-csv" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition mt-4 sm:mt-0 w-full sm:w-auto">Export to CSV</button>
+        </div>
+
+        <div id="list-summary-section-original" class="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
+             <div class="p-4 bg-sky-100 border-b border-sky-200 flex flex-col sm:flex-row justify-between items-center">
+                <div class="flex items-center mb-4 sm:mb-0">
+                    <span class="text-sky-800 font-bold text-xl">Total:</span>
+                    <span id="grand-total" class="ml-2 text-2xl font-bold text-sky-700">₹0.00</span>
+                </div>
+                <div class="flex flex-wrap justify-center sm:justify-end">
+                     <button id="save-list-button" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md mr-2 mb-2 sm:mb-0 transition">Save Current List</button>
+                    <button id="clear-all" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md mr-2 mb-2 sm:mb-0 transition">Clear All</button>
+                    <button id="print-list" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-md transition">Print List</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="bg-sky-50 text-sky-700">
+                            <th class="py-3 px-4 text-left w-2/5 sm:w-1/2">Item</th>
+                            <th class="py-3 px-4 text-center">Quantity</th>
+                            <th class="py-3 px-4 text-center price-header">Price</th>
+                            <th class="py-3 px-4 text-center total-header">Total</th>
+                            <th class="py-3 px-4 text-center w-16">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="grocery-list"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-bold text-sky-700 mb-4">Add New Item</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label for="category-select" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select id="category-select" class="w-full p-2 border-gray-300 rounded-md"></select>
+                </div>
+                <div>
+                    <label for="item-name" class="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                    <input type="text" id="item-name" class="w-full p-2 border-gray-300 rounded-md" placeholder="Enter item name">
+                </div>
+                <div>
+                    <label for="item-quantity" class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                    <input type="number" id="item-quantity" class="w-full p-2 border-gray-300 rounded-md" placeholder="Quantity" min="1" value="1">
+                </div>
+                <div>
+                    <label for="item-price" class="block text-sm font-medium text-gray-700 mb-1 price-label">Price</label>
+                    <input type="number" id="item-price" class="w-full p-2 border-gray-300 rounded-md" placeholder="Price per unit" step="0.01" min="0">
+                </div>
+            </div>
+            <button id="add-item" class="mt-4 bg-sky-600 hover:bg-sky-700 text-white px-6 py-2 rounded-md transition">Add Item</button>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-bold text-sky-700 mb-4">Add New Category</h2>
+            <div class="flex flex-col sm:flex-row gap-4 items-end">
+                <div class="flex-grow">
+                    <label for="new-category-name" class="block text-sm font-medium text-gray-700 mb-1">New Category Name</label>
+                    <input type="text" id="new-category-name" class="w-full p-2 border-gray-300 rounded-md" placeholder="e.g., Cleaning Supplies">
+                </div>
+                <button id="add-new-category-button" class="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2 rounded-md transition w-full sm:w-auto">Add Category</button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-bold text-sky-700 mb-4">Quick Add Items</h2>
+            <div id="quick-add-container" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold text-sky-700 mb-4">Shopping History</h2>
+            <div id="saved-lists-container" class="space-y-4">
+                <p id="no-saved-lists-message" class="text-gray-500 italic">No saved lists yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-confirm-modal" class="modal-overlay hidden"><div class="modal-content"><p id="confirm-modal-message" class="mb-4 text-lg">Are you sure?</p><div class="modal-buttons flex flex-col sm:flex-row justify-center"><button id="confirm-modal-yes" class="modal-confirm-button">Yes</button><button id="confirm-modal-no" class="modal-cancel-button">No</button></div></div></div>
+    <div id="custom-alert-modal" class="modal-overlay hidden"><div class="modal-content"><p id="alert-modal-message" class="mb-4 text-lg">Alert!</p><div class="modal-buttons"><button id="alert-modal-ok" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-md">OK</button></div></div></div>
+    <div id="prompt-modal" class="modal-overlay hidden"><div class="modal-content"><p id="prompt-modal-message" class="mb-4 text-lg">Enter a name:</p><input type="text" id="prompt-modal-input" class="w-full p-2 border-gray-300 rounded-md mb-4"><div class="modal-buttons flex flex-col sm:flex-row justify-center"><button id="prompt-modal-ok" class="bg-green-500 hover:bg-green-600 text-white">OK</button><button id="prompt-modal-cancel" class="modal-cancel-button">Cancel</button></div></div></div>
+
+    <div id="view-saved-list-modal" class="modal-overlay hidden">
+        <div class="modal-content w-full max-w-lg"> <h3 id="view-list-name" class="text-2xl font-bold mb-3 text-sky-700 dark:text-sky-300">Saved List Details</h3>
+            <div id="view-list-details" class="text-left mb-4 text-sm border-b border-gray-200 dark:border-gray-600 pb-3">
+                <p class="mb-1"><strong class="text-gray-700">Date:</strong> <span id="view-list-date" class="text-gray-600"></span></p>
+                <p><strong class="text-gray-700">Total:</strong> <span id="view-list-total" class="font-semibold text-gray-600"></span></p>
+            </div>
+            <h4 class="text-lg font-semibold mb-2 text-sky-600 dark:text-sky-400 text-left">Items:</h4>
+            <ul id="view-list-items" class="list-none max-h-60 overflow-y-auto text-left text-sm p-2 border rounded-md space-y-1"></ul>
+            <div class="mt-6 modal-buttons flex flex-col sm:flex-row justify-end items-center"> <button id="export-saved-list-csv-button" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md mb-2 sm:mb-0 sm:mr-2">Export CSV</button>
+                <button id="view-list-modal-close" class="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-md">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- DOM Elements ---
+            const htmlElement = document.documentElement;
+            const printContentArea = document.getElementById('print-content-area');
+
+            const addItemButton = document.getElementById('add-item');
+            const clearAllButton = document.getElementById('clear-all');
+            const printListButton = document.getElementById('print-list');
+            const saveListButton = document.getElementById('save-list-button');
+            const groceryListBody = document.getElementById('grocery-list');
+            const categorySelect = document.getElementById('category-select');
+            const itemNameInput = document.getElementById('item-name');
+            const itemQuantityInput = document.getElementById('item-quantity');
+            const itemPriceInput = document.getElementById('item-price');
+            const grandTotalSpan = document.getElementById('grand-total');
+            const quickAddButtonsContainer = document.getElementById('quick-add-container');
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const currencySelect = document.getElementById('currency-select');
+            const filterCategorySelect = document.getElementById('filter-category');
+            const exportCsvButton = document.getElementById('export-csv'); // For current list
+            const newCategoryNameInput = document.getElementById('new-category-name');
+            const addNewCategoryButton = document.getElementById('add-new-category-button');
+            const priceHeader = document.querySelector('.price-header');
+            const totalHeader = document.querySelector('.total-header');
+            const priceLabel = document.querySelector('.price-label');
+            const savedListsContainer = document.getElementById('saved-lists-container');
+            const noSavedListsMessage = document.getElementById('no-saved-lists-message');
+
+            // --- Modal Elements & Functions ---
+            const confirmModal = document.getElementById('custom-confirm-modal');
+            const confirmModalMessage = document.getElementById('confirm-modal-message');
+            const confirmModalYes = document.getElementById('confirm-modal-yes');
+            const confirmModalNo = document.getElementById('confirm-modal-no');
+            let confirmCallback = null;
+
+            const alertModal = document.getElementById('custom-alert-modal');
+            const alertModalMessage = document.getElementById('alert-modal-message');
+            const alertModalOk = document.getElementById('alert-modal-ok');
+
+            const promptModal = document.getElementById('prompt-modal');
+            const promptModalMessage = document.getElementById('prompt-modal-message');
+            const promptModalInput = document.getElementById('prompt-modal-input');
+            const promptModalOk = document.getElementById('prompt-modal-ok');
+            const promptModalCancel = document.getElementById('prompt-modal-cancel');
+            let promptCallback = null;
+
+            const viewSavedListModal = document.getElementById('view-saved-list-modal');
+            const viewListName = document.getElementById('view-list-name');
+            const viewListDate = document.getElementById('view-list-date');
+            const viewListTotal = document.getElementById('view-list-total');
+            const viewListItems = document.getElementById('view-list-items');
+            const viewListModalClose = document.getElementById('view-list-modal-close');
+            const exportSavedListCsvButton = document.getElementById('export-saved-list-csv-button'); // For saved list
+            let currentViewedListId = null; // To store ID of list being viewed in modal
+
+            function showConfirm(message, callback) { confirmModalMessage.textContent = message; confirmModal.classList.remove('hidden'); confirmCallback = callback; }
+            function hideConfirm() { confirmModal.classList.add('hidden'); confirmCallback = null; }
+            confirmModalYes.addEventListener('click', () => { if (confirmCallback) confirmCallback(true); hideConfirm(); });
+            confirmModalNo.addEventListener('click', () => { if (confirmCallback) confirmCallback(false); hideConfirm(); });
+
+            function showAlert(message) { alertModalMessage.textContent = message; alertModal.classList.remove('hidden'); }
+            alertModalOk.addEventListener('click', () => alertModal.classList.add('hidden'));
+
+            function showPrompt(message, defaultValue = "", callback) {
+                promptModalMessage.textContent = message; promptModalInput.value = defaultValue;
+                promptModal.classList.remove('hidden'); promptModalInput.focus(); promptCallback = callback;
+            }
+            function hidePrompt() { promptModal.classList.add('hidden'); promptCallback = null; }
+            promptModalOk.addEventListener('click', () => { if (promptCallback) promptCallback(promptModalInput.value); hidePrompt(); });
+            promptModalCancel.addEventListener('click', () => { if (promptCallback) promptCallback(null); hidePrompt(); });
+            promptModalInput.addEventListener('keypress', function(e) { if (e.key === 'Enter') promptModalOk.click(); });
+
+            viewListModalClose.addEventListener('click', () => {
+                viewSavedListModal.classList.add('hidden');
+                currentViewedListId = null; // Reset when modal closes
+            });
+            exportSavedListCsvButton.addEventListener('click', () => {
+                if (currentViewedListId) {
+                    exportSpecificSavedListToCSV(currentViewedListId);
+                } else {
+                    showAlert("Could not identify the list to export.");
+                }
+            });
+
+
+            // --- State Variables ---
+            let currentCurrency = 'INR';
+            const currencySymbols = { INR: '₹', USD: '$', EUR: '€', GBP: '£' };
+            let categories = [
+                { name: "Non-Vegetarian", emoji: "🥩", items: ["Egg", "Chicken", "Prawns", "Sardine Can"] },
+                { name: "Vegetables", emoji: "🥬", items: ["Cauliflower", "Tomato", "Onion", "Potato", "Carrot"] },
+                { name: "Grains", emoji: "🌾", items: ["Wheat", "Oats", "Rava", "Rice", "Parippu (Dal)"] },
+                { name: "Dairy", emoji: "🥛", items: ["Curd", "Milk", "Grated Coconut", "Coconut"] }
+            ];
+            let savedLists = [];
+
+            // --- Initialization ---
+            loadSettings();
+            populateCategoryDropdowns();
+            populateQuickAddSections();
+            renderSavedListsUI();
+            loadSavedItems();
+            updateCurrencyDisplay();
+            if (groceryListBody) {
+                new Sortable(groceryListBody, { animation: 150, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag', onEnd: saveItems });
+            }
+
+            // --- Event Listeners ---
+            if (addItemButton) addItemButton.addEventListener('click', handleAddItem);
+            if (clearAllButton) clearAllButton.addEventListener('click', () => handleClearAll(true)); // Pass true for confirmation
+            if (printListButton) printListButton.addEventListener('click', prepareAndPrint);
+            if (saveListButton) saveListButton.addEventListener('click', handleSaveCurrentList);
+            if (darkModeToggle) darkModeToggle.addEventListener('click', toggleDarkMode);
+            if (currencySelect) currencySelect.addEventListener('change', handleCurrencyChange);
+            if (filterCategorySelect) filterCategorySelect.addEventListener('change', filterItemsByCategory);
+            if (exportCsvButton) exportCsvButton.addEventListener('click', () => exportCurrentListToCSV()); // Changed name for clarity
+            if (addNewCategoryButton) addNewCategoryButton.addEventListener('click', handleAddNewCategory);
+
+            // --- Print Handling ---
+            function prepareAndPrint() {
+                if (!printContentArea) { console.error("Print content area not found!"); showAlert("Could not prepare content for printing."); return; }
+                const summarySectionOriginal = document.getElementById('list-summary-section-original');
+                if (!summarySectionOriginal) { console.error("Original summary section not found!"); showAlert("Could not prepare summary for printing."); return; }
+                const summaryClone = summarySectionOriginal.cloneNode(true);
+                summaryClone.id = "print-summary-section";
+                summaryClone.querySelectorAll('button').forEach(btn => btn.remove());
+
+                const itemsToPrint = getItemsFromDOM();
+                const tableForPrint = document.createElement('table');
+                tableForPrint.id = 'print-items-table'; tableForPrint.className = 'w-full';
+                const thead = document.createElement('thead');
+                thead.innerHTML = `<tr><th>Item</th><th>Category</th><th class="text-center-print">Quantity</th><th class="text-center-print">Price (${currencySymbols[currentCurrency]})</th><th class="text-center-print">Total (${currencySymbols[currentCurrency]})</th></tr>`;
+                tableForPrint.appendChild(thead);
+                const tbody = document.createElement('tbody');
+                if (itemsToPrint.length === 0) {
+                    const tr = tbody.insertRow(); const td = tr.insertCell(); td.colSpan = 5; td.textContent = "No items in the current list."; td.style.textAlign = "center"; td.style.padding = "10px";
+                } else {
+                    itemsToPrint.forEach(item => {
+                        const row = tbody.insertRow();
+                        row.insertCell().textContent = item.name; row.insertCell().textContent = item.category;
+                        row.insertCell().textContent = item.quantity; row.cells[2].classList.add('text-center-print');
+                        row.insertCell().textContent = item.price.toFixed(2); row.cells[3].classList.add('text-center-print');
+                        row.insertCell().textContent = (item.quantity * item.price).toFixed(2); row.cells[4].classList.add('text-center-print');
+                    });
+                }
+                tableForPrint.appendChild(tbody);
+                printContentArea.innerHTML = ''; printContentArea.appendChild(summaryClone); printContentArea.appendChild(tableForPrint);
+                window.print();
+            }
+
+            // --- Dark Mode ---
+            function toggleDarkMode() {
+                htmlElement.classList.toggle('dark');
+                localStorage.setItem('darkMode', htmlElement.classList.contains('dark'));
+                darkModeToggle.textContent = htmlElement.classList.contains('dark') ? '☀️' : '🌙';
+            }
+
+            // --- Currency ---
+            function handleCurrencyChange() {
+                currentCurrency = currencySelect.value; localStorage.setItem('currency', currentCurrency);
+                updateCurrencyDisplay(); updateAllItemTotalsAndGrandTotal();
+            }
+            function updateCurrencyDisplay() {
+                const symbol = currencySymbols[currentCurrency];
+                if(priceHeader) priceHeader.textContent = `Price (${symbol})`;
+                if(totalHeader) totalHeader.textContent = `Total (${symbol})`;
+                if(priceLabel) priceLabel.textContent = `Price (${symbol})`;
+                if(itemPriceInput) itemPriceInput.placeholder = `Price per unit in ${symbol}`;
+                document.querySelectorAll('.item-row').forEach(row => {
+                    const itemTotalCell = row.querySelector('.item-total');
+                    if (itemTotalCell) {
+                        const currentItem = getItemDataFromRow(row);
+                        if(currentItem) itemTotalCell.innerHTML = `${symbol}${(currentItem.quantity * currentItem.price).toFixed(2)}`;
+                    }
+                });
+                updateGrandTotal();
+            }
+            function getItemDataFromRow(rowElement) {
+                const quantityInput = rowElement.querySelector('.quantity-input'); const priceInput = rowElement.querySelector('.price-input');
+                if (!quantityInput || !priceInput) return null;
+                return { quantity: parseFloat(quantityInput.value) || 0, price: parseFloat(priceInput.value) || 0 };
+            }
+            function updateAllItemTotalsAndGrandTotal() {
+                document.querySelectorAll('.item-row').forEach(row => updateItemTotal(row.id, false));
+                updateGrandTotal(); saveItems();
+            }
+
+            // --- Categories & Quick Add ---
+            function populateCategoryDropdowns() {
+                if (!categorySelect || !filterCategorySelect) return;
+                const currentCatValue = categorySelect.value; const currentFilterValue = filterCategorySelect.value;
+                categorySelect.innerHTML = ''; filterCategorySelect.innerHTML = '<option value="all">All Categories</option>';
+                categories.forEach(cat => {
+                    const option = document.createElement('option'); option.value = cat.name; option.textContent = `${cat.emoji} ${cat.name}`;
+                    categorySelect.appendChild(option.cloneNode(true)); filterCategorySelect.appendChild(option);
+                });
+                if (categories.find(c => c.name === currentCatValue)) categorySelect.value = currentCatValue;
+                if (categories.find(c => c.name === currentFilterValue) || currentFilterValue === 'all') filterCategorySelect.value = currentFilterValue;
+            }
+            function populateQuickAddSections() {
+                if (!quickAddButtonsContainer) return;
+                quickAddButtonsContainer.innerHTML = '';
+                categories.forEach(cat => {
+                    const sectionDiv = document.createElement('div'); sectionDiv.className = 'border rounded-lg overflow-hidden shadow-sm';
+                    let itemsHTML = '';
+                    if (cat.items && cat.items.length > 0) {
+                        const sortedItems = [...cat.items].sort((a, b) => a.localeCompare(b));
+                        itemsHTML = sortedItems.map(item => `<button class="quick-add w-full text-left p-2 hover:bg-sky-50 dark:hover:bg-sky-800 hover:text-white rounded transition-colors duration-150" data-category="${cat.name}" data-name="${item}">${item}</button>`).join('');
+                    } else {
+                        itemsHTML = `<p class="p-3 text-sm text-gray-500 dark:text-gray-400 italic">No quick add items defined for this category.</p>`;
+                    }
+                    // Added 'quick-add-items-container' class for specific light/dark styling
+                    sectionDiv.innerHTML = `<div class="category-header text-white p-3 font-bold">${cat.emoji} ${cat.name}</div><div class="quick-add-items-container p-3 space-y-1">${itemsHTML}</div>`;
+                    quickAddButtonsContainer.appendChild(sectionDiv);
+                });
+                quickAddButtonsContainer.querySelectorAll('.quick-add').forEach(button => {
+                    button.addEventListener('click', function() { categorySelect.value = this.dataset.category; itemNameInput.value = this.dataset.name; itemPriceInput.focus(); });
+                });
+            }
+            function handleAddNewCategory() {
+                const newName = newCategoryNameInput.value.trim();
+                if (newName && !categories.find(c => c.name.toLowerCase() === newName.toLowerCase())) {
+                    categories.push({ name: newName, emoji: "🆕", items: [] });
+                    populateCategoryDropdowns(); populateQuickAddSections(); newCategoryNameInput.value = '';
+                    saveCategories(); showAlert(`Category "${newName}" added!`);
+                } else if (!newName) showAlert('Please enter a category name.');
+                else showAlert(`Category "${newName}" already exists.`);
+            }
+             function addScannedItemToQuickAdd(itemName, itemCategoryName) {
+                const categoryObj = categories.find(c => c.name === itemCategoryName);
+                if (categoryObj) {
+                    const normalizedItemName = itemName.trim();
+                    if (normalizedItemName && !categoryObj.items.some(i => i.toLowerCase() === normalizedItemName.toLowerCase())) {
+                        categoryObj.items.push(normalizedItemName); populateQuickAddSections(); saveCategories();
+                    }
+                }
+            }
+
+            // --- Item Management (Current List) ---
+            function handleAddItem() {
+                const categoryValue = categorySelect.value; const nameValue = itemNameInput.value.trim();
+                const quantityValue = parseFloat(itemQuantityInput.value) || 0; const priceValue = parseFloat(itemPriceInput.value) || 0;
+                if (!nameValue) { showAlert('Please enter an item name.'); itemNameInput.focus(); return; }
+                if (quantityValue <= 0) { showAlert('Please enter a valid quantity.'); itemQuantityInput.focus(); return; }
+                if (priceValue < 0 || isNaN(priceValue)) { showAlert('Please enter a valid price.'); itemPriceInput.focus(); return; }
+                const itemId = 'item-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                renderItemRow({ id: itemId, name: nameValue, category: categoryValue, quantity: quantityValue, price: priceValue });
+                addScannedItemToQuickAdd(nameValue, categoryValue);
+                itemNameInput.value = ''; itemQuantityInput.value = '1'; itemPriceInput.value = ''; itemNameInput.focus();
+                updateGrandTotal(); saveItems();
+            }
+            function renderItemRow(item) {
+                const total = item.quantity * item.price;
+                const tr = document.createElement('tr'); tr.id = item.id;
+                tr.className = 'item-row border-b border-gray-200 dark:border-gray-700'; tr.dataset.category = item.category;
+                // Inputs now have explicit light mode classes, dark mode overrides via CSS
+                tr.innerHTML = `
+                    <td class="py-3 px-4"><div class="font-medium text-gray-800">${item.name}</div><div class="text-xs text-gray-500 dark:text-gray-400">${item.category}</div></td>
+                    <td class="py-3 px-4 text-center"><input type="number" class="quantity-input w-16 p-1 bg-white text-gray-900 border border-gray-300 rounded-md text-center" value="${item.quantity}" min="1" data-item-id="${item.id}"></td>
+                    <td class="py-3 px-4 text-center"><input type="number" class="price-input w-20 p-1 bg-white text-gray-900 border border-gray-300 rounded-md text-center" value="${item.price.toFixed(2)}" step="0.01" min="0" data-item-id="${item.id}"></td>
+                    <td class="py-3 px-4 text-center font-medium text-gray-700 item-total" data-item-id="${item.id}">${currencySymbols[currentCurrency]}${total.toFixed(2)}</td>
+                    <td class="py-3 px-4 text-center"><button class="delete-item text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-500 transition" data-item-id="${item.id}" aria-label="Delete item"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></td>
+                `;
+                groceryListBody.appendChild(tr);
+                attachRowEventListeners(tr, item.id);
+            }
+            function attachRowEventListeners(rowElement, itemId) {
+                rowElement.querySelector('.delete-item').addEventListener('click', () => deleteItem(itemId));
+                rowElement.querySelector('.quantity-input').addEventListener('input', () => updateItemTotal(itemId));
+                rowElement.querySelector('.price-input').addEventListener('input', () => updateItemTotal(itemId));
+            }
+            function updateItemTotal(itemId, doSave = true) {
+                const row = document.getElementById(itemId); if (!row) return;
+                const quantity = parseFloat(row.querySelector('.quantity-input').value) || 0;
+                const price = parseFloat(row.querySelector('.price-input').value) || 0;
+                const total = quantity * price;
+                row.querySelector('.item-total').textContent = `${currencySymbols[currentCurrency]}${total.toFixed(2)}`;
+                updateGrandTotal(); if (doSave) saveItems();
+            }
+            function deleteItem(itemId) {
+                showConfirm('Are you sure you want to delete this item?', (confirmed) => { if (confirmed) { document.getElementById(itemId)?.remove(); updateGrandTotal(); saveItems(); } });
+            }
+            function handleClearAll(showConfirmation = true) {
+                const clearAction = () => {
+                    groceryListBody.innerHTML = ''; localStorage.removeItem('groceryItems'); updateGrandTotal();
+                };
+                if (showConfirmation) {
+                     showConfirm('Are you sure you want to clear all items?', (confirmed) => { if (confirmed) clearAction(); });
+                } else {
+                    clearAction();
+                }
+            }
+            function updateGrandTotal() {
+                let grandTotal = 0;
+                document.querySelectorAll('#grocery-list .item-total').forEach(element => { grandTotal += parseFloat(element.textContent.replace(currencySymbols[currentCurrency], '')) || 0; });
+                grandTotalSpan.textContent = `${currencySymbols[currentCurrency]}${grandTotal.toFixed(2)}`;
+            }
+
+            // --- Filtering ---
+            function filterItemsByCategory() {
+                const selectedCategory = filterCategorySelect.value;
+                document.querySelectorAll('#grocery-list tr.item-row').forEach(row => {
+                    if (selectedCategory === 'all' || row.dataset.category === selectedCategory) row.style.display = '';
+                    else row.style.display = 'none';
+                });
+            }
+
+            // --- CSV Export ---
+            function exportCurrentListToCSV() { // Renamed for clarity
+                const items = getItemsFromDOM(); if (items.length === 0) { showAlert("No items to export."); return; }
+                generateAndDownloadCSV(items, currentCurrency, "current_grocery_list.csv");
+            }
+
+            function exportSpecificSavedListToCSV(listId) {
+                const list = savedLists.find(l => l.id === listId);
+                if (!list) { showAlert("Could not find the saved list to export."); return; }
+                const listFileName = `${list.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_list.csv`;
+                generateAndDownloadCSV(list.items, list.currency, listFileName);
+            }
+
+            function generateAndDownloadCSV(items, currencyForCSV, fileName) {
+                let csvContent = "data:text/csv;charset=utf-8,";
+                const symbol = currencySymbols[currencyForCSV] || currencyForCSV;
+                csvContent += `Item Name,Category,Quantity,Price (${symbol}),Total (${symbol})\r\n`;
+                items.forEach(item => {
+                    const row = [
+                        `"${item.name.replace(/"/g, '""')}"`,
+                        `"${item.category.replace(/"/g, '""')}"`,
+                        item.quantity,
+                        item.price.toFixed(2),
+                        (item.quantity * item.price).toFixed(2)
+                    ].join(",");
+                    csvContent += row + "\r\n";
+                });
+                const link = document.createElement("a");
+                link.setAttribute("href", encodeURI(csvContent));
+                link.setAttribute("download", fileName);
+                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            }
+
+            function getItemsFromDOM() {
+                 const itemsArray = [];
+                groceryListBody.querySelectorAll('tr.item-row').forEach(row => {
+                    const nameElement = row.querySelector('td:first-child div:first-child'); const categoryElement = row.querySelector('td:first-child div:last-child');
+                    const quantityInput = row.querySelector('.quantity-input'); const priceInput = row.querySelector('.price-input');
+                    if (nameElement && categoryElement && quantityInput && priceInput) {
+                        itemsArray.push({id: row.id, name: nameElement.textContent, category: categoryElement.textContent, quantity: parseFloat(quantityInput.value) || 0, price: parseFloat(priceInput.value) || 0 });
+                    }
+                });
+                return itemsArray;
+            }
+
+            // --- Shopping History (Saved Lists) ---
+            function handleSaveCurrentList() {
+                const currentItems = getItemsFromDOM();
+                if (currentItems.length === 0) { showAlert("Your current list is empty. Add some items to save."); return; }
+                const defaultName = `List - ${new Date().toLocaleDateString()}`;
+                showPrompt("Enter a name for this list:", defaultName, (listName) => {
+                    if (listName) {
+                        const newList = {
+                            id: 'savedList-' + Date.now(), name: listName, dateSaved: new Date().toISOString(),
+                            currency: currentCurrency, grandTotal: grandTotalSpan.textContent, items: currentItems
+                        };
+                        savedLists.unshift(newList); saveHistory(); renderSavedListsUI();
+                        showAlert(`List "${listName}" saved! Current list has been cleared.`);
+                        handleClearAll(false); // Clear current list without confirmation
+                    }
+                });
+            }
+            function renderSavedListsUI() {
+                if (!savedListsContainer) return;
+                savedListsContainer.innerHTML = ''; if (savedLists.length === 0) { noSavedListsMessage.style.display = 'block'; return; }
+                noSavedListsMessage.style.display = 'none';
+                savedLists.forEach(list => {
+                    const listDiv = document.createElement('div');
+                    listDiv.className = 'p-3 border border-gray-200 dark:border-gray-600 rounded-md shadow-sm flex justify-between items-center flex-wrap gap-2'; // Added flex-wrap and gap
+                    listDiv.innerHTML = `
+                        <div class="flex-grow min-w-0"> <h4 class="font-semibold text-gray-800 truncate">${list.name}</h4> <p class="text-xs text-gray-500 dark:text-gray-400">Saved: ${new Date(list.dateSaved).toLocaleDateString()} - Total: ${list.grandTotal}</p>
+                        </div>
+                        <div class="flex gap-2 flex-shrink-0"> <button class="view-saved-list-btn text-sm bg-sky-500 hover:bg-sky-600 text-white px-3 py-1 rounded-md" data-list-id="${list.id}">View</button>
+                            <button class="delete-saved-list-btn text-sm bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md" data-list-id="${list.id}">Delete</button>
+                        </div>`;
+                    savedListsContainer.appendChild(listDiv);
+                });
+                savedListsContainer.querySelectorAll('.view-saved-list-btn').forEach(btn => btn.addEventListener('click', (e) => displaySavedList(e.target.dataset.listId)));
+                savedListsContainer.querySelectorAll('.delete-saved-list-btn').forEach(btn => btn.addEventListener('click', (e) => handleDeleteSavedList(e.target.dataset.listId)));
+            }
+            function displaySavedList(listId) {
+                const list = savedLists.find(l => l.id === listId); if (!list) return;
+                currentViewedListId = listId; // Store the ID of the list being viewed
+                viewListName.textContent = list.name; viewListDate.textContent = new Date(list.dateSaved).toLocaleString();
+                viewListTotal.textContent = `${list.grandTotal}`;
+                viewListItems.innerHTML = '';
+                list.items.forEach(item => {
+                    const li = document.createElement('li');
+                    li.className = "flex justify-between items-center py-2 px-2 border-b border-gray-100 dark:border-gray-600 last:border-b-0 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-sm transition-colors";
+                    li.innerHTML = `<span class="text-gray-800">${item.name}</span><span class="text-xs text-gray-600 dark:text-gray-400">Qty: ${item.quantity}, ${currencySymbols[list.currency] || list.currency}${(item.price).toFixed(2)}</span>`;
+                    viewListItems.appendChild(li);
+                });
+                viewSavedListModal.classList.remove('hidden');
+            }
+            function handleDeleteSavedList(listId) {
+                const list = savedLists.find(l => l.id === listId); if (!list) return;
+                showConfirm(`Are you sure you want to delete the list "${list.name}"?`, (confirmed) => {
+                    if (confirmed) { savedLists = savedLists.filter(l => l.id !== listId); saveHistory(); renderSavedListsUI(); showAlert(`List "${list.name}" deleted.`); }
+                });
+            }
+
+            // --- Persistence (localStorage) ---
+            function saveItems() { localStorage.setItem('groceryItems', JSON.stringify(getItemsFromDOM())); }
+            function loadSavedItems() {
+                const items = JSON.parse(localStorage.getItem('groceryItems')) || [];
+                if(groceryListBody) groceryListBody.innerHTML = '';
+                items.forEach(item => { item.price = parseFloat(item.price || 0); renderItemRow(item); });
+                updateGrandTotal();
+            }
+            function saveCategories() { localStorage.setItem('groceryCategories', JSON.stringify(categories)); }
+            function saveHistory() { localStorage.setItem('savedGroceryLists', JSON.stringify(savedLists)); }
+
+            function loadSettings() {
+                const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+                if (savedDarkMode) {
+                    htmlElement.classList.add('dark');
+                    if(darkModeToggle) darkModeToggle.textContent = '☀️';
+                } else {
+                    htmlElement.classList.remove('dark');
+                    if(darkModeToggle) darkModeToggle.textContent = '🌙';
+                }
+                currentCurrency = localStorage.getItem('currency') || 'INR';
+                if(currencySelect) currencySelect.value = currentCurrency;
+                const savedCats = JSON.parse(localStorage.getItem('groceryCategories'));
+                if (savedCats && savedCats.length > 0) categories = savedCats;
+                savedLists = JSON.parse(localStorage.getItem('savedGroceryLists')) || [];
+            }
+        });
+    </script>
+</body>
+</html>
